@@ -9,49 +9,110 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         /* Custom Animations */
+        @keyframes gradient-xy {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes float-blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
         @keyframes float-heart {
             0%, 100% { transform: translateY(0); opacity: 0.3; }
             50% { transform: translateY(-20px); opacity: 0.6; }
+        }
+        @keyframes float-heart-apology {
+            0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
+            50% { opacity: 0.4; }
+            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
         }
         @keyframes float-sparkle {
             0%, 100% { transform: translateY(0); opacity: 0.2; }
             50% { transform: translateY(30px); opacity: 0.5; }
         }
         @keyframes pulse-heart {
-            0%, 100% { transform: scale(1) rotate(0deg); }
-            50% { transform: scale(1.2) rotate(10deg); }
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
+        .animate-gradient {
+            background-size: 400% 400%;
+            animation: gradient-xy 15s ease infinite;
+        }
+        .animate-blob {
+            animation: float-blob 10s infinite ease-in-out;
+        }
         .animate-float-heart { animation: float-heart 5s infinite ease-in-out; }
         .animate-float-sparkle { animation: float-sparkle 7s infinite ease-in-out; }
-        .animate-pulse-heart { animation: pulse-heart 2s infinite ease-in-out; }
+        .animate-pulse-heart { animation: pulse-heart 1.5s infinite ease-in-out; }
+        .animate-fade-in { animation: fade-in 1s ease-out forwards; }
 
         /* Transition Classes */
         .stage-container {
-            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                        transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                        filter 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .stage-hidden {
             display: none;
             opacity: 0;
-            transform: scale(0.9);
         }
         .stage-enter {
             opacity: 0;
-            transform: scale(0.9) translateY(20px);
+            transform: scale(1.05) translateY(20px);
+            filter: blur(10px);
         }
         .stage-active {
             opacity: 1;
             transform: scale(1) translateY(0);
+            filter: blur(0);
         }
         .stage-exit {
             opacity: 0;
-            transform: scale(0.9) translateY(-20px);
+            transform: scale(0.95) translateY(-20px);
+            filter: blur(10px);
+        }
+
+        /* Magnetic Button */
+        .magnetic-btn {
+            transition: transform 0.1s ease-out, background-color 0.2s;
+        }
+
+        /* Dots */
+        .dot {
+            transition: all 0.3s ease;
+        }
+        .dot-active {
+            background-color: #4F46E5; /* Indigo 600 */
+            transform: scale(1.25);
+        }
+
+        /* Apology Hearts */
+        .apology-heart {
+            position: absolute;
+            color: #FDA4AF; /* Rose 300 */
+            animation: float-heart-apology 4s linear infinite;
         }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-rose-100 via-purple-100 to-sky-100 flex items-center justify-center p-4 font-sans overflow-hidden relative">
+<body class="min-h-screen bg-gradient-to-br from-rose-100 via-purple-100 to-sky-100 animate-gradient flex items-center justify-center p-4 font-sans overflow-hidden relative">
 
-    <!-- Background Elements -->
+    <!-- Floating Blobs -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-0 left-1/4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div class="absolute top-0 right-1/4 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style="animation-delay: 2s"></div>
+        <div class="absolute -bottom-8 left-1/3 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style="animation-delay: 4s"></div>
+        <div class="absolute bottom-1/4 right-1/3 w-72 h-72 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style="animation-delay: 6s"></div>
+    </div>
+
+    <!-- Background Icons -->
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
         <div class="absolute top-10 left-10 text-rose-300 animate-float-heart">
             <i data-lucide="heart" width="48" height="48" fill="currentColor"></i>
@@ -61,24 +122,29 @@
         </div>
     </div>
 
-    <div class="max-w-md w-full z-10 relative">
+    <!-- Apology Hearts Container (Hidden by default) -->
+    <div id="apology-hearts-container" class="absolute inset-0 overflow-hidden pointer-events-none hidden">
+        <!-- Hearts will be injected here via JS -->
+    </div>
+
+    <div class="max-w-md w-full z-10 relative flex flex-col items-center">
         
         <!-- STAGE: INTRO -->
-        <div id="stage-intro" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 text-center border border-white/50 stage-active">
+        <div id="stage-intro" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 text-center border border-white/50 stage-active w-full">
             <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6 text-rose-500">
                 <i data-lucide="message-circle" width="32" height="32"></i>
             </div>
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">Hey Apoorva...</h1>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2 animate-fade-in">Hey Apoorva...</h1>
             <p class="text-gray-600 mb-8">
                 We need to talk about what happened earlier. I made this because texting wouldn't cut it.
             </p>
-            <button onclick="setStage('explanation')" class="bg-gray-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 mx-auto w-full cursor-pointer">
+            <button onclick="setStage('explanation')" class="magnetic-btn bg-gray-900 text-white px-6 py-3 rounded-2xl font-medium hover:bg-gray-800 flex items-center justify-center gap-2 mx-auto w-full cursor-pointer">
                 Listen to my side <i data-lucide="arrow-right" width="18" height="18"></i>
             </button>
         </div>
 
         <!-- STAGE: EXPLANATION -->
-        <div id="stage-explanation" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 border border-white/50 stage-hidden">
+        <div id="stage-explanation" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 border border-white/50 stage-hidden w-full">
             <div class="flex items-center gap-3 mb-4 text-gray-400 text-sm font-medium uppercase tracking-wider">
                 <i data-lucide="volume-2" width="16" height="16"></i>
                 <span>The Incident Report</span>
@@ -104,11 +170,11 @@
             </p>
 
             <div class="space-y-3">
-                <button onclick="setStage('generous_reveal')" class="w-full bg-emerald-500 text-white px-6 py-3 rounded-xl font-medium hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                <button onclick="handleExplanationAccepted()" class="magnetic-btn w-full bg-emerald-500 text-white px-6 py-3 rounded-2xl font-medium hover:bg-emerald-600 flex items-center justify-center gap-2 cursor-pointer">
                     <i data-lucide="smile" width="20" height="20"></i>
                     Okay, that makes sense
                 </button>
-                <button onclick="setStage('apology_loop')" class="w-full bg-white text-rose-500 border-2 border-rose-100 px-6 py-3 rounded-xl font-medium hover:bg-rose-50 transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                <button onclick="setStage('apology_loop')" class="magnetic-btn w-full bg-white text-rose-500 border-2 border-rose-100 px-6 py-3 rounded-2xl font-medium hover:bg-rose-50 flex items-center justify-center gap-2 cursor-pointer">
                     <i data-lucide="volume-x" width="20" height="20"></i>
                     Nope, you definitely shouted
                 </button>
@@ -116,21 +182,20 @@
         </div>
 
         <!-- STAGE: APOLOGY LOOP -->
-        <div id="stage-apology_loop" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 text-center border border-white/50 stage-hidden">
+        <div id="stage-apology_loop" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 text-center border border-white/50 stage-hidden w-full">
             <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-500">
                 <i data-lucide="frown" width="32" height="32"></i>
             </div>
             
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">Okay, okay...</h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">I'm really sorry...</h2>
             <p class="text-gray-600 mb-8">
-                Even if I didn't <i>mean</i> to shout, I'm sorry if it felt like I did. 
-                You know I'd never actually yell at you, right? I was just teasing!
+                I never meant to hurt you or make you feel bad. I value our friendship way too much to ever shout at you for real.
                 <br/><br/>
-                Can we be cool?
+                Please forgive me? 🥺
             </p>
 
             <div class="flex flex-col gap-3 items-center">
-                <button id="btn-forgive" onclick="handleForgive()" class="bg-indigo-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-500/30 active:scale-95 cursor-pointer w-full max-w-xs duration-200">
+                <button id="btn-forgive" onclick="handleForgive()" class="magnetic-btn bg-indigo-600 text-white px-6 py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 shadow-lg hover:shadow-indigo-500/30 active:scale-95 cursor-pointer w-full max-w-xs duration-200">
                     Fine, I forgive you ❤️
                 </button>
                 
@@ -141,7 +206,7 @@
         </div>
 
         <!-- STAGE: GENEROUS REVEAL -->
-        <div id="stage-generous_reveal" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 text-center border border-white/50 stage-hidden">
+        <div id="stage-generous_reveal" class="stage-container bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl p-8 text-center border border-white/50 stage-hidden w-full">
             <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6 text-amber-500">
                 <i data-lucide="sparkles" width="32" height="32"></i>
             </div>
@@ -154,13 +219,13 @@
                 That's just how much our friendship means to me! 
             </p>
 
-            <button onclick="handleForgive()" class="bg-amber-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-amber-600 transition-all shadow-lg hover:shadow-amber-500/30 cursor-pointer">
+            <button onclick="handleForgive()" class="magnetic-btn bg-amber-500 text-white px-8 py-3 rounded-2xl font-bold hover:bg-amber-600 shadow-lg hover:shadow-amber-500/30 cursor-pointer">
                 You're the best (Click me)
             </button>
         </div>
 
         <!-- STAGE: SUCCESS -->
-        <div id="stage-success" class="stage-container text-center stage-hidden">
+        <div id="stage-success" class="stage-container text-center stage-hidden w-full">
             <div class="inline-block animate-pulse-heart">
                 <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl text-rose-500">
                     <i data-lucide="heart" width="48" height="48" fill="currentColor"></i>
@@ -171,6 +236,14 @@
             <p class="text-gray-600 text-lg max-w-xs mx-auto">
                 Thanks for understanding, Apoorva. Now go study (for real this time)! 😉
             </p>
+        </div>
+
+        <!-- Stage Indicators -->
+        <div class="mt-8 flex gap-2 stage-indicators opacity-50">
+            <div class="dot w-2 h-2 rounded-full bg-gray-400 dot-active" id="dot-0"></div>
+            <div class="dot w-2 h-2 rounded-full bg-gray-400" id="dot-1"></div>
+            <div class="dot w-2 h-2 rounded-full bg-gray-400" id="dot-2"></div>
+            <div class="dot w-2 h-2 rounded-full bg-gray-400" id="dot-3"></div>
         </div>
 
     </div>
@@ -197,9 +270,61 @@
             "Forgive meeee"
         ];
 
+        // Stage mapping for dots
+        const stageIndex = {
+            'intro': 0,
+            'explanation': 1,
+            'apology_loop': 2,
+            'generous_reveal': 2,
+            'success': 3
+        };
+
+        function updateDots(stage) {
+            const index = stageIndex[stage];
+            document.querySelectorAll('.dot').forEach((dot, i) => {
+                if (i === index) {
+                    dot.classList.add('dot-active');
+                    dot.classList.add('bg-indigo-600');
+                    dot.classList.remove('bg-gray-400');
+                } else {
+                    dot.classList.remove('dot-active');
+                    dot.classList.remove('bg-indigo-600');
+                    dot.classList.add('bg-gray-400');
+                }
+            });
+        }
+
+        function toggleApologyHearts(show) {
+            const container = document.getElementById('apology-hearts-container');
+            if (show) {
+                container.classList.remove('hidden');
+                // Create hearts if empty
+                if (container.children.length === 0) {
+                    for (let i = 0; i < 15; i++) {
+                        const heart = document.createElement('div');
+                        heart.innerHTML = '<i data-lucide="heart" width="24" height="24" fill="currentColor"></i>';
+                        heart.className = 'apology-heart';
+                        heart.style.left = Math.random() * 100 + '%';
+                        heart.style.animationDelay = Math.random() * 4 + 's';
+                        heart.style.opacity = Math.random() * 0.5;
+                        container.appendChild(heart);
+                    }
+                    lucide.createIcons();
+                }
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
         function setStage(newStage) {
             const currentEl = document.getElementById(`stage-${currentStage}`);
             const newEl = document.getElementById(`stage-${newStage}`);
+
+            // Update dots
+            updateDots(newStage);
+
+            // Toggle apology hearts
+            toggleApologyHearts(newStage === 'apology_loop');
 
             // Exit animation
             currentEl.classList.remove('stage-active');
@@ -220,7 +345,17 @@
                 newEl.classList.add('stage-active');
                 
                 currentStage = newStage;
-            }, 300); // Match CSS transition time
+            }, 500); // Match CSS transition time
+        }
+
+        function handleExplanationAccepted() {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#10B981', '#34D399', '#6EE7B7'] // Emerald colors
+            });
+            setStage('generous_reveal');
         }
 
         function handleForgive() {
@@ -261,6 +396,25 @@
                 easing: 'ease-in-out'
             });
         }
+
+        // Magnetic Button Logic
+        document.querySelectorAll('.magnetic-btn').forEach(btn => {
+            btn.addEventListener('mousemove', (e) => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                // Limit the movement
+                const xMove = x * 0.2;
+                const yMove = y * 0.2;
+                
+                btn.style.transform = `translate(${xMove}px, ${yMove}px)`;
+            });
+
+            btn.addEventListener('mouseleave', () => {
+                btn.style.transform = 'translate(0px, 0px)';
+            });
+        });
     </script>
 </body>
 </html>
